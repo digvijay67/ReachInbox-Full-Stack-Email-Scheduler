@@ -398,6 +398,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   User: 'User',
+  SlackIntegration: 'SlackIntegration',
   Sender: 'Sender',
   Email: 'Email'
 } as const
@@ -415,7 +416,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "sender" | "email"
+    modelProps: "user" | "slackIntegration" | "sender" | "email"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -490,6 +491,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    SlackIntegration: {
+      payload: Prisma.$SlackIntegrationPayload<ExtArgs>
+      fields: Prisma.SlackIntegrationFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SlackIntegrationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackIntegrationPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SlackIntegrationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackIntegrationPayload>
+        }
+        findFirst: {
+          args: Prisma.SlackIntegrationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackIntegrationPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SlackIntegrationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackIntegrationPayload>
+        }
+        findMany: {
+          args: Prisma.SlackIntegrationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackIntegrationPayload>[]
+        }
+        create: {
+          args: Prisma.SlackIntegrationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackIntegrationPayload>
+        }
+        createMany: {
+          args: Prisma.SlackIntegrationCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SlackIntegrationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackIntegrationPayload>[]
+        }
+        delete: {
+          args: Prisma.SlackIntegrationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackIntegrationPayload>
+        }
+        update: {
+          args: Prisma.SlackIntegrationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackIntegrationPayload>
+        }
+        deleteMany: {
+          args: Prisma.SlackIntegrationDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SlackIntegrationUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SlackIntegrationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackIntegrationPayload>[]
+        }
+        upsert: {
+          args: Prisma.SlackIntegrationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SlackIntegrationPayload>
+        }
+        aggregate: {
+          args: Prisma.SlackIntegrationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSlackIntegration>
+        }
+        groupBy: {
+          args: Prisma.SlackIntegrationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SlackIntegrationGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SlackIntegrationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SlackIntegrationCountAggregateOutputType> | number
         }
       }
     }
@@ -693,6 +768,20 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+export const SlackIntegrationScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  teamId: 'teamId',
+  teamName: 'teamName',
+  incomingWebhookUrl: 'incomingWebhookUrl',
+  channel: 'channel',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SlackIntegrationScalarFieldEnum = (typeof SlackIntegrationScalarFieldEnum)[keyof typeof SlackIntegrationScalarFieldEnum]
+
+
 export const SenderScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -721,6 +810,7 @@ export const EmailScalarFieldEnum = {
   attempts: 'attempts',
   error: 'error',
   jobId: 'jobId',
+  processingStartedAt: 'processingStartedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -979,6 +1069,7 @@ export interface PrismaClientOptionsWithAdapter extends PrismaClientBaseOptions 
 export type PrismaClientOptions = PrismaClientOptionsWithAccelerateUrl | PrismaClientOptionsWithAdapter
 export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
+  slackIntegration?: Prisma.SlackIntegrationOmit
   sender?: Prisma.SenderOmit
   email?: Prisma.EmailOmit
 }

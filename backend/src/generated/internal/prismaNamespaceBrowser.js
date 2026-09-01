@@ -48,7 +48,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NullsOrder = exports.QueryMode = exports.SortOrder = exports.EmailScalarFieldEnum = exports.SenderScalarFieldEnum = exports.UserScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.Decimal = void 0;
+exports.NullsOrder = exports.QueryMode = exports.SortOrder = exports.EmailScalarFieldEnum = exports.SenderScalarFieldEnum = exports.SlackIntegrationScalarFieldEnum = exports.UserScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.Decimal = void 0;
 const runtime = __importStar(require("@prisma/client/runtime/index-browser"));
 exports.Decimal = runtime.Decimal;
 exports.NullTypes = {
@@ -76,6 +76,7 @@ exports.JsonNull = runtime.JsonNull;
 exports.AnyNull = runtime.AnyNull;
 exports.ModelName = {
     User: 'User',
+    SlackIntegration: 'SlackIntegration',
     Sender: 'Sender',
     Email: 'Email'
 };
@@ -94,6 +95,16 @@ exports.UserScalarFieldEnum = {
     name: 'name',
     email: 'email',
     avatar: 'avatar',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+};
+exports.SlackIntegrationScalarFieldEnum = {
+    id: 'id',
+    userId: 'userId',
+    teamId: 'teamId',
+    teamName: 'teamName',
+    incomingWebhookUrl: 'incomingWebhookUrl',
+    channel: 'channel',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
 };
@@ -121,6 +132,7 @@ exports.EmailScalarFieldEnum = {
     attempts: 'attempts',
     error: 'error',
     jobId: 'jobId',
+    processingStartedAt: 'processingStartedAt',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
 };

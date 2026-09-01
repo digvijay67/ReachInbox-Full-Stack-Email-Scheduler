@@ -1,19 +1,23 @@
 import "dotenv/config";
-import nodemailer from "nodemailer";
+import nodemailer, {
+  Transporter,
+} from "nodemailer";
 
 type SenderConfig = {
   email: string;
   name: string | null;
 };
 
-export async function sendEmail(
-  _sender: SenderConfig,
-  to: string,
-  subject: string,
-  body: string
-) {
+let cachedTransporter: Transporter | null = null;
+
+function getTransporter(): Transporter {
+  if (cachedTransporter) {
+    return cachedTransporter;
+  }
+
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
+  const smtpFrom = process.env.SMTP_FROM;
 
   if (!smtpUser || !smtpPass) {
     throw new Error(
@@ -21,43 +25,62 @@ export async function sendEmail(
     );
   }
 
-  const transporter =
-    nodemailer.createTransport({
-      host:
-        process.env.SMTP_HOST ||
-        "smtp.ethereal.email",
+  if (!smtpFrom) {
+    throw new Error(
+      "SMTP_FROM is missing"
+    );
+  }
 
-      port: Number(
-        process.env.SMTP_PORT || 587
-      ),
+  cachedTransporter = nodemailer.createTransport({
+    host:
+      process.env.SMTP_HOST ||
+      "smtp.ethereal.email",
 
-      secure: false,
+    port: Number(
+      process.env.SMTP_PORT || 587
+    ),
 
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-    });
+    secure: false,
 
-  const info =
-    await transporter.sendMail({
-      // IMPORTANT:
-      // Always use Ethereal account as sender
-      from:
-        process.env.SMTP_FROM ||
-        smtpUser,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
 
-      to,
-      subject,
-      text: body,
-    });
+    pool: true,
+    maxConnections: 5,
+  });
+
+  return cachedTransporter;
+}
+
+export async function sendEmail(
+  sender: SenderConfig,
+  to: string,
+  subject: string,
+  body: string
+) {
+  const transporter = getTransporter();
+
+  // Always use the Ethereal sender from .env.
+  // The logged-in user's DB sender is NOT used
+  // as the From address.
+  const fromHeader =
+    process.env.SMTP_FROM!;
+
+  const info = await transporter.sendMail({
+    from: fromHeader,
+    to,
+    subject,
+    text: body,
+  });
 
   const previewUrl =
     nodemailer.getTestMessageUrl(info);
 
   console.log("--------------------------------");
   console.log("Ethereal email sent");
-  console.log("From:", process.env.SMTP_FROM || smtpUser);
+  console.log("From:", fromHeader);
   console.log("To:", to);
   console.log("Message ID:", info.messageId);
 

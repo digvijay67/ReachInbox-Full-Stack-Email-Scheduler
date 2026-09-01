@@ -9,6 +9,7 @@
  * 🟢 You can import this file directly.
  */
 export type * from './models/User'
+export type * from './models/SlackIntegration'
 export type * from './models/Sender'
 export type * from './models/Email'
 export type * from './commonInputTypes'

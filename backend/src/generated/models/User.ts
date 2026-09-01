@@ -234,6 +234,7 @@ export type UserWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   emails?: Prisma.EmailListRelationFilter
   senders?: Prisma.SenderListRelationFilter
+  slackIntegration?: Prisma.XOR<Prisma.SlackIntegrationNullableScalarRelationFilter, Prisma.SlackIntegrationWhereInput> | null
 }
 
 export type UserOrderByWithRelationInput = {
@@ -246,6 +247,7 @@ export type UserOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   emails?: Prisma.EmailOrderByRelationAggregateInput
   senders?: Prisma.SenderOrderByRelationAggregateInput
+  slackIntegration?: Prisma.SlackIntegrationOrderByWithRelationInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -261,6 +263,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   emails?: Prisma.EmailListRelationFilter
   senders?: Prisma.SenderListRelationFilter
+  slackIntegration?: Prisma.XOR<Prisma.SlackIntegrationNullableScalarRelationFilter, Prisma.SlackIntegrationWhereInput> | null
 }, "id" | "googleId" | "email">
 
 export type UserOrderByWithAggregationInput = {
@@ -300,6 +303,7 @@ export type UserCreateInput = {
   updatedAt?: Date | string
   emails?: Prisma.EmailCreateNestedManyWithoutUserInput
   senders?: Prisma.SenderCreateNestedManyWithoutUserInput
+  slackIntegration?: Prisma.SlackIntegrationCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -312,6 +316,7 @@ export type UserUncheckedCreateInput = {
   updatedAt?: Date | string
   emails?: Prisma.EmailUncheckedCreateNestedManyWithoutUserInput
   senders?: Prisma.SenderUncheckedCreateNestedManyWithoutUserInput
+  slackIntegration?: Prisma.SlackIntegrationUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -323,6 +328,7 @@ export type UserUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   emails?: Prisma.EmailUpdateManyWithoutUserNestedInput
   senders?: Prisma.SenderUpdateManyWithoutUserNestedInput
+  slackIntegration?: Prisma.SlackIntegrationUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -335,6 +341,7 @@ export type UserUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   emails?: Prisma.EmailUncheckedUpdateManyWithoutUserNestedInput
   senders?: Prisma.SenderUncheckedUpdateManyWithoutUserNestedInput
+  slackIntegration?: Prisma.SlackIntegrationUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -429,6 +436,20 @@ export type IntFieldUpdateOperationsInput = {
   divide?: number
 }
 
+export type UserCreateNestedOneWithoutSlackIntegrationInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSlackIntegrationInput, Prisma.UserUncheckedCreateWithoutSlackIntegrationInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSlackIntegrationInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutSlackIntegrationNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutSlackIntegrationInput, Prisma.UserUncheckedCreateWithoutSlackIntegrationInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutSlackIntegrationInput
+  upsert?: Prisma.UserUpsertWithoutSlackIntegrationInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutSlackIntegrationInput, Prisma.UserUpdateWithoutSlackIntegrationInput>, Prisma.UserUncheckedUpdateWithoutSlackIntegrationInput>
+}
+
 export type UserCreateNestedOneWithoutSendersInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutSendersInput, Prisma.UserUncheckedCreateWithoutSendersInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutSendersInput
@@ -457,6 +478,68 @@ export type UserUpdateOneRequiredWithoutEmailsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutEmailsInput, Prisma.UserUpdateWithoutEmailsInput>, Prisma.UserUncheckedUpdateWithoutEmailsInput>
 }
 
+export type UserCreateWithoutSlackIntegrationInput = {
+  googleId: string
+  name: string
+  email: string
+  avatar?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  emails?: Prisma.EmailCreateNestedManyWithoutUserInput
+  senders?: Prisma.SenderCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutSlackIntegrationInput = {
+  id?: number
+  googleId: string
+  name: string
+  email: string
+  avatar?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  emails?: Prisma.EmailUncheckedCreateNestedManyWithoutUserInput
+  senders?: Prisma.SenderUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutSlackIntegrationInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutSlackIntegrationInput, Prisma.UserUncheckedCreateWithoutSlackIntegrationInput>
+}
+
+export type UserUpsertWithoutSlackIntegrationInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutSlackIntegrationInput, Prisma.UserUncheckedUpdateWithoutSlackIntegrationInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutSlackIntegrationInput, Prisma.UserUncheckedCreateWithoutSlackIntegrationInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutSlackIntegrationInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutSlackIntegrationInput, Prisma.UserUncheckedUpdateWithoutSlackIntegrationInput>
+}
+
+export type UserUpdateWithoutSlackIntegrationInput = {
+  googleId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  emails?: Prisma.EmailUpdateManyWithoutUserNestedInput
+  senders?: Prisma.SenderUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutSlackIntegrationInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  googleId?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  avatar?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  emails?: Prisma.EmailUncheckedUpdateManyWithoutUserNestedInput
+  senders?: Prisma.SenderUncheckedUpdateManyWithoutUserNestedInput
+}
+
 export type UserCreateWithoutSendersInput = {
   googleId: string
   name: string
@@ -465,6 +548,7 @@ export type UserCreateWithoutSendersInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   emails?: Prisma.EmailCreateNestedManyWithoutUserInput
+  slackIntegration?: Prisma.SlackIntegrationCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSendersInput = {
@@ -476,6 +560,7 @@ export type UserUncheckedCreateWithoutSendersInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   emails?: Prisma.EmailUncheckedCreateNestedManyWithoutUserInput
+  slackIntegration?: Prisma.SlackIntegrationUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSendersInput = {
@@ -502,6 +587,7 @@ export type UserUpdateWithoutSendersInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   emails?: Prisma.EmailUpdateManyWithoutUserNestedInput
+  slackIntegration?: Prisma.SlackIntegrationUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSendersInput = {
@@ -513,6 +599,7 @@ export type UserUncheckedUpdateWithoutSendersInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   emails?: Prisma.EmailUncheckedUpdateManyWithoutUserNestedInput
+  slackIntegration?: Prisma.SlackIntegrationUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutEmailsInput = {
@@ -523,6 +610,7 @@ export type UserCreateWithoutEmailsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   senders?: Prisma.SenderCreateNestedManyWithoutUserInput
+  slackIntegration?: Prisma.SlackIntegrationCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutEmailsInput = {
@@ -534,6 +622,7 @@ export type UserUncheckedCreateWithoutEmailsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   senders?: Prisma.SenderUncheckedCreateNestedManyWithoutUserInput
+  slackIntegration?: Prisma.SlackIntegrationUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutEmailsInput = {
@@ -560,6 +649,7 @@ export type UserUpdateWithoutEmailsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   senders?: Prisma.SenderUpdateManyWithoutUserNestedInput
+  slackIntegration?: Prisma.SlackIntegrationUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutEmailsInput = {
@@ -571,6 +661,7 @@ export type UserUncheckedUpdateWithoutEmailsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   senders?: Prisma.SenderUncheckedUpdateManyWithoutUserNestedInput
+  slackIntegration?: Prisma.SlackIntegrationUncheckedUpdateOneWithoutUserNestedInput
 }
 
 
@@ -623,6 +714,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   updatedAt?: boolean
   emails?: boolean | Prisma.User$emailsArgs<ExtArgs>
   senders?: boolean | Prisma.User$sendersArgs<ExtArgs>
+  slackIntegration?: boolean | Prisma.User$slackIntegrationArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -660,6 +752,7 @@ export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = run
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   emails?: boolean | Prisma.User$emailsArgs<ExtArgs>
   senders?: boolean | Prisma.User$sendersArgs<ExtArgs>
+  slackIntegration?: boolean | Prisma.User$slackIntegrationArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -670,6 +763,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   objects: {
     emails: Prisma.$EmailPayload<ExtArgs>[]
     senders: Prisma.$SenderPayload<ExtArgs>[]
+    slackIntegration: Prisma.$SlackIntegrationPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: number
@@ -1075,6 +1169,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   readonly [Symbol.toStringTag]: "PrismaPromise"
   emails<T extends Prisma.User$emailsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$emailsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EmailPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   senders<T extends Prisma.User$sendersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$sendersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SenderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  slackIntegration<T extends Prisma.User$slackIntegrationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$slackIntegrationArgs<ExtArgs>>): Prisma.Prisma__SlackIntegrationClient<runtime.Types.Result.GetResult<Prisma.$SlackIntegrationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1549,6 +1644,25 @@ export type User$sendersArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
   take?: number
   skip?: number
   distinct?: Prisma.SenderScalarFieldEnum | Prisma.SenderScalarFieldEnum[]
+}
+
+/**
+ * User.slackIntegration
+ */
+export type User$slackIntegrationArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SlackIntegration
+   */
+  select?: Prisma.SlackIntegrationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SlackIntegration
+   */
+  omit?: Prisma.SlackIntegrationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SlackIntegrationInclude<ExtArgs> | null
+  where?: Prisma.SlackIntegrationWhereInput
 }
 
 /**

@@ -1,0 +1,14 @@
+{
+  "name": "reachinbox-scheduler",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently -n backend,worker,frontend -c blue,magenta,green \"npm --prefix backend run dev\" \"npm --prefix backend run worker\" \"npm --prefix frontend run dev -- --host 0.0.0.0\"",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "start": "concurrently -n backend,worker -c blue,magenta \"npm --prefix backend run start\" \"npm --prefix backend run worker\"",
+    "preview": "npm run build && concurrently -n backend,worker,frontend -c blue,magenta,green \"npm --prefix backend run start\" \"npm --prefix backend run worker\" \"npm --prefix frontend run preview -- --host 0.0.0.0\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}

@@ -52,6 +52,7 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   User: 'User',
+  SlackIntegration: 'SlackIntegration',
   Sender: 'Sender',
   Email: 'Email'
 } as const
@@ -85,6 +86,20 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+export const SlackIntegrationScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  teamId: 'teamId',
+  teamName: 'teamName',
+  incomingWebhookUrl: 'incomingWebhookUrl',
+  channel: 'channel',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SlackIntegrationScalarFieldEnum = (typeof SlackIntegrationScalarFieldEnum)[keyof typeof SlackIntegrationScalarFieldEnum]
+
+
 export const SenderScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -113,6 +128,7 @@ export const EmailScalarFieldEnum = {
   attempts: 'attempts',
   error: 'error',
   jobId: 'jobId',
+  processingStartedAt: 'processingStartedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

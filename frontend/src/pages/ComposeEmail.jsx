@@ -448,18 +448,17 @@ export default function ComposeEmail() {
                                 "application/json",
                         },
 
-                        body: JSON.stringify(
+                                               body: JSON.stringify(
                             {
                                 /*
-                                 * Multiple emails are
-                                 * sent as comma-separated
-                                 * string because your
-                                 * Prisma Email.to is String.
+                                 * Send recipients as an array —
+                                 * the backend now creates one
+                                 * Email row + one BullMQ job per
+                                 * recipient, each tracked and
+                                 * rate-limited independently.
                                  */
 
-                                to: finalRecipients.join(
-                                    ","
-                                ),
+                                to: finalRecipients,
 
                                 subject:
                                     subject.trim(),

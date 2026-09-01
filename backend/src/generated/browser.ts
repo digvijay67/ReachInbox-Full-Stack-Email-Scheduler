@@ -23,6 +23,11 @@ export * from './enums';
  */
 export type User = Prisma.UserModel
 /**
+ * Model SlackIntegration
+ * 
+ */
+export type SlackIntegration = Prisma.SlackIntegrationModel
+/**
  * Model Sender
  * 
  */

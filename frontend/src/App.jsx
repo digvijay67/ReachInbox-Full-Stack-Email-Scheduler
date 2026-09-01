@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import EmailDetails from "./pages/EmailDetails";
 import ComposeEmail from "./pages/ComposeEmail";
+import SlackSettings from "./pages/SlackSettings";
 
 function App() {
     return (
@@ -23,6 +24,10 @@ function App() {
                     path="/dashboard"
                     element={<Dashboard />}
                 />
+                <Route
+                    path="/slack"
+                    element={<SlackSettings />}
+                />
 
                 <Route
                     path="/email/:id"
@@ -33,6 +38,7 @@ function App() {
                     path="/compose"
                     element={<ComposeEmail />}
                 />
+                
 
             </Routes>
         </BrowserRouter>

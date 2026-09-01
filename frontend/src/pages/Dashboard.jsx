@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = "http://localhost:5000";
+const SEARCH_DEBOUNCE_MS = 350;
 
 export default function Dashboard() {
     const navigate = useNavigate();
@@ -21,6 +22,33 @@ export default function Dashboard() {
 
     const [successMessage, setSuccessMessage] =
         useState("");
+
+    const [slackConnected, setSlackConnected] = useState(false);
+    const [slackLoading, setSlackLoading] = useState(false);
+    const [slackMessage, setSlackMessage] = useState("");
+
+    // ==========================================
+    // SEARCH STATE
+    // ==========================================
+
+    const [searchQuery, setSearchQuery] =
+        useState("");
+
+    const [searchResults, setSearchResults] =
+        useState(null);
+    // null = no search active (show tab view)
+    // [] or [...] = search active (show search results view)
+
+    const [searching, setSearching] =
+        useState(false);
+
+    const [searchError, setSearchError] =
+        useState("");
+
+    const [profileOpen, setProfileOpen] = useState(false);
+
+    const searchDebounceRef = useRef(null);
+    const searchRequestId = useRef(0);
 
     // ==========================================
     // LOAD USER
@@ -138,6 +166,7 @@ export default function Dashboard() {
             await Promise.all([
                 loadScheduledEmails(),
                 loadSentEmails(),
+                checkSlackStatus(),
             ]);
         } catch (error) {
             console.error(
@@ -158,6 +187,231 @@ export default function Dashboard() {
     useEffect(() => {
         loadDashboard();
     }, []);
+
+    // ==========================================
+    // SEARCH EMAILS (Elasticsearch)
+    // ==========================================
+
+    const runSearch = async (query) => {
+        const trimmed = query.trim();
+
+        if (!trimmed) {
+            setSearchResults(null);
+            setSearchError("");
+            setSearching(false);
+            return;
+        }
+
+        // Guard against out-of-order responses:
+        // only the latest request is allowed to update state.
+        const requestId = ++searchRequestId.current;
+
+        try {
+            setSearching(true);
+            setSearchError("");
+
+            const params = new URLSearchParams({
+                q: trimmed,
+            });
+
+            const response = await fetch(
+                `${API}/api/emails/search?${params.toString()}`,
+                {
+                    method: "GET",
+                    credentials: "include",
+                }
+            );
+
+            if (response.status === 401) {
+                navigate("/");
+                return;
+            }
+
+            const data =
+                await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                    "Search failed"
+                );
+            }
+
+            // Ignore stale responses from an older keystroke.
+            if (
+                requestId !==
+                searchRequestId.current
+            ) {
+                return;
+            }
+
+            setSearchResults(
+                Array.isArray(data.results)
+                    ? data.results
+                    : []
+            );
+        } catch (error) {
+            if (
+                requestId !==
+                searchRequestId.current
+            ) {
+                return;
+            }
+
+            console.error(
+                "Search error:",
+                error
+            );
+
+            setSearchError(
+                error instanceof Error
+                    ? error.message
+                    : "Search failed"
+            );
+
+            setSearchResults([]);
+        } finally {
+            if (
+                requestId ===
+                searchRequestId.current
+            ) {
+                setSearching(false);
+            }
+        }
+    };
+
+    const handleSearchChange = (event) => {
+        const value = event.target.value;
+
+        setSearchQuery(value);
+
+        if (searchDebounceRef.current) {
+            clearTimeout(
+                searchDebounceRef.current
+            );
+        }
+
+        searchDebounceRef.current =
+            setTimeout(() => {
+                runSearch(value);
+            }, SEARCH_DEBOUNCE_MS);
+    };
+
+    const clearSearch = () => {
+        if (searchDebounceRef.current) {
+            clearTimeout(
+                searchDebounceRef.current
+            );
+        }
+
+        searchRequestId.current += 1;
+
+        setSearchQuery("");
+        setSearchResults(null);
+        setSearchError("");
+        setSearching(false);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (searchDebounceRef.current) {
+                clearTimeout(
+                    searchDebounceRef.current
+                );
+            }
+        };
+    }, []);
+
+    const isSearchActive =
+        searchResults !== null;
+
+
+    // ==========================================
+    // SLACK
+    // ==========================================
+
+    const checkSlackStatus = async () => {
+        try {
+            const response = await fetch(
+                `${API}/api/slack/status`,
+                {
+                    method: "GET",
+                    credentials: "include",
+                }
+            );
+
+            if (response.status === 401) {
+                navigate("/");
+                return;
+            }
+
+            if (!response.ok) {
+                return;
+            }
+
+            const data = await response.json();
+
+            setSlackConnected(
+                Boolean(
+                    data.connected ??
+                    data.slackConnected
+                )
+            );
+        } catch (error) {
+            console.error(
+                "Slack status error:",
+                error
+            );
+        }
+    };
+
+    const connectSlack = () => {
+        window.location.href =
+            `${API}/api/slack/connect`;
+    };
+
+    const disconnectSlack = async () => {
+        try {
+            setSlackLoading(true);
+            setSlackMessage("");
+
+            const response = await fetch(
+                `${API}/api/slack/disconnect`,
+                {
+                    method: "POST",
+                    credentials: "include",
+                }
+            );
+
+            const data =
+                await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                    "Failed to disconnect Slack"
+                );
+            }
+
+            setSlackConnected(false);
+            setSlackMessage(
+                "Slack disconnected."
+            );
+        } catch (error) {
+            console.error(
+                "Slack disconnect error:",
+                error
+            );
+
+            setSlackMessage(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to disconnect Slack."
+            );
+        } finally {
+            setSlackLoading(false);
+        }
+    };
 
     // ==========================================
     // LOGOUT
@@ -194,8 +448,9 @@ export default function Dashboard() {
     // CURRENT EMAILS
     // ==========================================
 
-    const currentEmails =
-        activeTab === "scheduled"
+    const currentEmails = isSearchActive
+        ? searchResults
+        : activeTab === "scheduled"
             ? scheduled
             : sent;
 
@@ -234,43 +489,51 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* User */}
+                
+                {/* =====================================
+    PROFILE
+===================================== */}
 
-                <div className="px-3 mt-4">
+                <div className="px-3 mt-4 relative">
+
+                    {/* Profile Button */}
 
                     <button
                         type="button"
-                        onClick={handleLogout}
+                        onClick={() =>
+                            setProfileOpen((prev) => !prev)
+                        }
                         className="w-full bg-[#f3f6f4] rounded-2xl px-3 py-3 flex items-center gap-3 hover:bg-[#edf1ee] transition"
                     >
+
+                        {/* Google Avatar */}
 
                         <div className="w-9 h-9 shrink-0 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
 
                             {user?.avatar ? (
                                 <img
                                     src={user.avatar}
-                                    alt={
-                                        user.name ||
-                                        "User"
-                                    }
+                                    alt={user.name || "User"}
                                     className="w-full h-full object-cover"
+                                    referrerPolicy="no-referrer"
                                 />
                             ) : (
                                 <span className="text-sm font-semibold text-gray-600">
                                     {user?.name
                                         ?.charAt(0)
-                                        ?.toUpperCase() ||
-                                        "U"}
+                                        ?.toUpperCase() || "U"}
                                 </span>
                             )}
 
                         </div>
 
+
+                        {/* Name + Email */}
+
                         <div className="flex-1 min-w-0 text-left">
 
                             <div className="text-sm font-medium truncate">
-                                {user?.name ||
-                                    "User"}
+                                {user?.name || "User"}
                             </div>
 
                             <div className="text-[10px] text-gray-400 truncate">
@@ -279,13 +542,112 @@ export default function Dashboard() {
 
                         </div>
 
-                        <span className="text-gray-400 text-xs">
+
+                        {/* Arrow */}
+
+                        <span
+                            className={`text-gray-400 text-xs transition-transform ${profileOpen
+                                    ? "rotate-180"
+                                    : ""
+                                }`}
+                        >
                             ⌄
                         </span>
 
                     </button>
 
+
+                    {/* =====================================
+        PROFILE DROPDOWN
+    ===================================== */}
+
+                    {profileOpen && (
+
+                        <div className="absolute left-3 right-3 top-full mt-2 z-50">
+
+                            <div className="bg-white border border-[#eeeeee] rounded-xl shadow-lg overflow-hidden">
+
+                                {/* Profile Info */}
+
+                                <div className="px-4 py-3 border-b border-[#eeeeee]">
+
+                                    <div className="flex items-center gap-3">
+
+                                        <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center shrink-0">
+
+                                            {user?.avatar ? (
+                                                <img
+                                                    src={user.avatar}
+                                                    alt={
+                                                        user.name ||
+                                                        "User"
+                                                    }
+                                                    className="w-full h-full object-cover"
+                                                    referrerPolicy="no-referrer"
+                                                />
+                                            ) : (
+                                                <span className="text-sm font-semibold text-gray-600">
+                                                    {user?.name
+                                                        ?.charAt(0)
+                                                        ?.toUpperCase() ||
+                                                        "U"}
+                                                </span>
+                                            )}
+
+                                        </div>
+
+
+                                        <div className="min-w-0">
+
+                                            <div className="text-sm font-semibold truncate">
+                                                {user?.name ||
+                                                    "User"}
+                                            </div>
+
+                                            <div className="text-[11px] text-gray-400 truncate">
+                                                {user?.email ||
+                                                    ""}
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+
+                                {/* Logout */}
+
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        setProfileOpen(false);
+                                        await handleLogout();
+                                    }}
+                                    className="w-full px-4 py-3 flex items-center gap-3 text-sm text-red-500 hover:bg-red-50 transition"
+                                >
+
+                                    <span className="text-base">
+                                        ↪
+                                    </span>
+
+                                    <span>
+                                        Logout
+                                    </span>
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    )}
+
                 </div>
+
+
+
+
 
                 {/* Compose */}
 
@@ -301,6 +663,76 @@ export default function Dashboard() {
 
                 </div>
 
+                {/* Slack */}
+
+                <div className="px-4 mt-5">
+
+                    <div className="border border-[#eeeeee] rounded-xl p-3">
+
+                        <div className="flex items-center gap-2 mb-2">
+
+                            <div className="w-7 h-7 rounded-lg bg-[#4A154B] flex items-center justify-center text-white text-xs font-bold">
+                                #
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+
+                                <div className="text-xs font-semibold">
+                                    Slack
+                                </div>
+
+                                <div className="text-[10px] text-gray-400">
+                                    {slackConnected
+                                        ? "Connected"
+                                        : "Not connected"}
+                                </div>
+
+                            </div>
+
+                            <div
+                                className={`w-2 h-2 rounded-full ${slackConnected
+                                    ? "bg-[#00b83f]"
+                                    : "bg-gray-300"
+                                    }`}
+                            />
+
+                        </div>
+
+                        {!slackConnected ? (
+
+                            <button
+                                type="button"
+                                onClick={connectSlack}
+                                className="w-full h-8 rounded-lg bg-[#4A154B] text-white text-xs font-medium hover:opacity-90 transition"
+                            >
+                                Connect Slack
+                            </button>
+
+                        ) : (
+
+                            <button
+                                type="button"
+                                onClick={disconnectSlack}
+                                disabled={slackLoading}
+                                className="w-full h-8 rounded-lg border border-gray-200 text-gray-600 text-xs hover:bg-gray-50 transition disabled:opacity-50"
+                            >
+                                {slackLoading
+                                    ? "Disconnecting..."
+                                    : "Disconnect Slack"}
+                            </button>
+
+                        )}
+
+                        {slackMessage && (
+                            <div className="mt-2 text-[10px] text-gray-500">
+                                {slackMessage}
+                            </div>
+                        )}
+
+                    </div>
+
+                </div>
+
                 {/* Navigation */}
 
                 <div className="mt-7 px-3">
@@ -313,17 +745,17 @@ export default function Dashboard() {
 
                     <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                            clearSearch();
                             setActiveTab(
                                 "scheduled"
-                            )
-                        }
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition ${
-                            activeTab ===
+                            );
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition ${activeTab ===
                             "scheduled"
-                                ? "bg-[#e5f5ec] font-medium"
-                                : "hover:bg-gray-50 text-gray-600"
-                        }`}
+                            ? "bg-[#e5f5ec] font-medium"
+                            : "hover:bg-gray-50 text-gray-600"
+                            }`}
                     >
 
                         <span>◷</span>
@@ -342,14 +774,14 @@ export default function Dashboard() {
 
                     <button
                         type="button"
-                        onClick={() =>
-                            setActiveTab("sent")
-                        }
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition ${
-                            activeTab === "sent"
-                                ? "bg-[#e5f5ec] font-medium"
-                                : "hover:bg-gray-50 text-gray-600"
-                        }`}
+                        onClick={() => {
+                            clearSearch();
+                            setActiveTab("sent");
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition ${activeTab === "sent"
+                            ? "bg-[#e5f5ec] font-medium"
+                            : "hover:bg-gray-50 text-gray-600"
+                            }`}
                     >
 
                         <span>➤</span>
@@ -388,9 +820,33 @@ export default function Dashboard() {
 
                             <input
                                 type="text"
-                                placeholder="Search"
+                                value={searchQuery}
+                                onChange={
+                                    handleSearchChange
+                                }
+                                placeholder="Search emails by subject, recipient, or body"
                                 className="flex-1 bg-transparent outline-none text-sm"
                             />
+
+                            {searching && (
+                                <span className="text-[10px] text-gray-400 ml-2 whitespace-nowrap">
+                                    Searching...
+                                </span>
+                            )}
+
+                            {!searching &&
+                                searchQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={
+                                            clearSearch
+                                        }
+                                        className="text-gray-400 hover:text-gray-600 text-sm ml-2"
+                                        title="Clear search"
+                                    >
+                                        ×
+                                    </button>
+                                )}
 
                         </div>
 
@@ -423,6 +879,14 @@ export default function Dashboard() {
                     </div>
                 )}
 
+                {/* Search error */}
+
+                {searchError && (
+                    <div className="mx-6 mt-4 rounded-lg bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3">
+                        {searchError}
+                    </div>
+                )}
+
                 {/* Page Header */}
 
                 <div className="px-6 pt-5 pb-3 flex items-center justify-between">
@@ -430,19 +894,22 @@ export default function Dashboard() {
                     <div>
 
                         <h2 className="text-lg font-semibold">
-                            {activeTab ===
-                            "scheduled"
-                                ? "Scheduled"
-                                : "Sent"}
+                            {isSearchActive
+                                ? `Search results for "${searchQuery}"`
+                                : activeTab ===
+                                    "scheduled"
+                                    ? "Scheduled"
+                                    : "Sent"}
                         </h2>
 
                         <p className="text-xs text-gray-400 mt-1">
-                            {currentEmails.length}{" "}
-                            email
-                            {currentEmails.length ===
-                            1
-                                ? ""
-                                : "s"}
+                            {searching
+                                ? "Searching..."
+                                : `${currentEmails.length} email${currentEmails.length ===
+                                    1
+                                    ? ""
+                                    : "s"
+                                }`}
                         </p>
 
                     </div>
@@ -461,8 +928,16 @@ export default function Dashboard() {
 
                 <div>
 
-                    {currentEmails.length ===
-                    0 ? (
+                    {searching && currentEmails.length === 0 ? (
+
+                        <div className="min-h-[350px] flex items-center justify-center">
+                            <div className="text-sm text-gray-400">
+                                Searching...
+                            </div>
+                        </div>
+
+                    ) : currentEmails.length ===
+                        0 ? (
 
                         <div className="min-h-[350px] flex items-center justify-center">
 
@@ -473,16 +948,19 @@ export default function Dashboard() {
                                 </div>
 
                                 <p className="text-sm text-gray-500">
-                                    No{" "}
-                                    {activeTab ===
-                                    "scheduled"
-                                        ? "scheduled"
-                                        : "sent"}{" "}
-                                    emails
+                                    {isSearchActive
+                                        ? `No emails match "${searchQuery}"`
+                                        : `No ${activeTab ===
+                                            "scheduled"
+                                            ? "scheduled"
+                                            : "sent"
+                                        } emails`}
                                 </p>
 
                                 <p className="text-xs text-gray-400 mt-1">
-                                    Your emails will appear here.
+                                    {isSearchActive
+                                        ? "Try a different keyword."
+                                        : "Your emails will appear here."}
                                 </p>
 
                             </div>
@@ -521,7 +999,26 @@ export default function Dashboard() {
 
                                         <div className="flex items-center gap-2">
 
-                                            {activeTab ===
+                                            {isSearchActive &&
+                                                email.status && (
+                                                    <span
+                                                        className={`rounded-full px-3 py-1 text-[10px] whitespace-nowrap ${email.status ===
+                                                            "SENT"
+                                                            ? "bg-[#e7f6ee] text-[#00a83f]"
+                                                            : email.status ===
+                                                                "FAILED"
+                                                                ? "bg-red-50 text-red-500"
+                                                                : "bg-[#fff0e6] text-[#f27b25]"
+                                                            }`}
+                                                    >
+                                                        {
+                                                            email.status
+                                                        }
+                                                    </span>
+                                                )}
+
+                                            {!isSearchActive &&
+                                                activeTab ===
                                                 "scheduled" &&
                                                 email.scheduledAt && (
                                                     <span className="bg-[#fff0e6] text-[#f27b25] rounded-full px-3 py-1 text-[10px] whitespace-nowrap">
@@ -532,7 +1029,8 @@ export default function Dashboard() {
                                                     </span>
                                                 )}
 
-                                            {activeTab ===
+                                            {!isSearchActive &&
+                                                activeTab ===
                                                 "sent" &&
                                                 email.sentAt && (
                                                     <span className="bg-[#e7f6ee] text-[#00a83f] rounded-full px-3 py-1 text-[10px] whitespace-nowrap">

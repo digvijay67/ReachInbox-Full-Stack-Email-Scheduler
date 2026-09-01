@@ -1,7 +1,9 @@
 import { redis } from "../lib/redis";
 
 const MAX_EMAILS_PER_HOUR = Number(
-  process.env.MAX_EMAILS_PER_HOUR || 200
+  process.env.MAX_EMAILS_PER_HOUR_PER_SENDER ||
+    process.env.MAX_EMAILS_PER_HOUR ||
+    200
 );
 
 const MIN_DELAY_MS = Number(
@@ -20,11 +22,17 @@ export async function acquireHourlyLimit(
 ) {
   const now = new Date();
 
+  const istNow = new Date(
+  now.toLocaleString("en-US", {
+    timeZone: "Asia/Kolkata",
+  })
+);
+
   const hourKey = [
-    now.getUTCFullYear(),
-    String(now.getUTCMonth() + 1).padStart(2, "0"),
-    String(now.getUTCDate()).padStart(2, "0"),
-    String(now.getUTCHours()).padStart(2, "0"),
+    istNow.getFullYear(),
+    String(istNow.getMonth() + 1).padStart(2, "0"),
+    String(istNow.getDate()).padStart(2, "0"),
+    String(istNow.getHours()).padStart(2, "0"),
   ].join("-");
 
   const key = `email-rate:${senderId}:${hourKey}`;
@@ -57,15 +65,48 @@ export async function acquireHourlyLimit(
 }
 
 /**
- * Makes sure emails from the same sender
- * have at least MIN_DELAY_MS between them.
+ * Above this, we do NOT block inline inside the job.
  *
- * Redis is used so multiple workers share
- * the same sender timing.
+ * The BullMQ job lock (see workerOptions.lockDuration in
+ * email.worker.ts, currently 60000ms) only protects a job for
+ * so long. If many emails for the same sender become due at
+ * once, sequential MIN_DELAY_MS spacing can push a job's wait
+ * time past the lock duration while it's still legitimately
+ * sleeping — not crashed. BullMQ would then treat it as stalled
+ * and hand it to another worker, risking a duplicate send.
+ *
+ * Kept well under lockDuration (60000ms) so there's always
+ * headroom even if the send itself takes a few seconds.
  */
-export async function waitForMinimumDelay(
+const MAX_INLINE_WAIT_MS = 20000;
+
+export type SendSlot = {
+  /** How long the caller should actually wait, in ms. */
+  waitMs: number;
+
+  /** The absolute time this slot is reserved for. */
+  nextSendAt: Date;
+
+  /**
+   * If true, the wait is too long to safely block inside the
+   * current job's lock window. The caller should NOT sleep —
+   * it should release this job and re-queue a fresh delayed
+   * BullMQ job for `nextSendAt` instead.
+   */
+  shouldDefer: boolean;
+};
+
+/**
+ * Atomically reserves the next allowed send time for a sender,
+ * enforcing at least MIN_DELAY_MS between consecutive sends.
+ *
+ * Redis-backed (via a Lua script for atomicity) so this is safe
+ * across multiple workers / server instances, exactly like the
+ * hourly limiter above.
+ */
+export async function reserveSendSlot(
   senderId: number
-) {
+): Promise<SendSlot> {
   const key = `email-next-send:${senderId}`;
 
   const now = Date.now();
@@ -103,13 +144,30 @@ export async function waitForMinimumDelay(
 
   const nextSend = Number(result);
 
-  const waitTime = nextSend - now;
+  const waitMs = Math.max(nextSend - now, 0);
 
-  if (waitTime > 0) {
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, waitTime);
-    });
+  return {
+    waitMs,
+    nextSendAt: new Date(nextSend),
+    shouldDefer: waitMs > MAX_INLINE_WAIT_MS,
+  };
+}
+
+/**
+ * Blocks the current async call for `waitMs`.
+ *
+ * Only ever call this for SHORT waits (see MAX_INLINE_WAIT_MS
+ * above / SendSlot.shouldDefer) — never for a wait long enough
+ * to risk exceeding the BullMQ job's lock duration.
+ */
+export async function sleepForSendSlot(waitMs: number) {
+  if (waitMs <= 0) {
+    return;
   }
+
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, waitMs);
+  });
 }
 
 /**
@@ -126,15 +184,19 @@ export async function waitForMinimumDelay(
  * This Date is correct for BullMQ/DB.
  */
 export function getNextHour() {
-  const nextHour = new Date();
+  const now = new Date();
 
-  nextHour.setUTCMinutes(0);
-  nextHour.setUTCSeconds(0);
-  nextHour.setUTCMilliseconds(0);
-
-  nextHour.setUTCHours(
-    nextHour.getUTCHours() + 1
+  const istNow = new Date(
+    now.toLocaleString("en-US", {
+      timeZone: "Asia/Kolkata",
+    })
   );
 
-  return nextHour;
+  istNow.setMinutes(0);
+  istNow.setSeconds(0);
+  istNow.setMilliseconds(0);
+
+  istNow.setHours(istNow.getHours() + 1);
+
+  return istNow;
 }

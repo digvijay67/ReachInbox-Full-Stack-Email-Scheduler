@@ -11,25 +11,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireAuth = requireAuth;
 const prisma_1 = require("../lib/prisma");
-// export interface AuthenticatedRequest extends Request {
-//   session: any;
-//   user?: {
-//     id: number;
-//     googleId: string;
-//     name: string;
-//     email: string;
-//     avatar: string | null;
-//   };
-// }
 function requireAuth(req, res, next) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const userId = req.session.userId;
             if (!userId) {
-                res.status(401).json({
-                    message: "Authentication required",
+                return res.status(401).json({
+                    message: "Please login with Google first",
                 });
-                return;
             }
             const user = yield prisma_1.prisma.user.findUnique({
                 where: {
@@ -38,17 +27,35 @@ function requireAuth(req, res, next) {
             });
             if (!user) {
                 req.session.destroy(() => { });
-                res.status(401).json({
-                    message: "User not found",
+                return res.status(401).json({
+                    message: "User session is invalid",
                 });
-                return;
             }
-            req.user = user;
+            const sender = yield prisma_1.prisma.sender.findFirst({
+                where: {
+                    userId: user.id,
+                },
+            });
+            if (!sender) {
+                return res.status(403).json({
+                    message: "Google sender is not connected",
+                });
+            }
+            req.user = {
+                id: user.id,
+                googleId: user.googleId,
+                email: user.email,
+            };
+            req.sender = {
+                id: sender.id,
+                email: sender.email,
+                userId: sender.userId,
+            };
             next();
         }
         catch (error) {
-            console.error("Auth middleware error:", error);
-            res.status(500).json({
+            console.error("Authentication error:", error);
+            return res.status(500).json({
                 message: "Authentication failed",
             });
         }

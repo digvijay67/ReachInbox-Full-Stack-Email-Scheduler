@@ -53,6 +53,7 @@ export type EmailMinAggregateOutputType = {
   attempts: number | null
   error: string | null
   jobId: string | null
+  processingStartedAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -70,6 +71,7 @@ export type EmailMaxAggregateOutputType = {
   attempts: number | null
   error: string | null
   jobId: string | null
+  processingStartedAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -87,6 +89,7 @@ export type EmailCountAggregateOutputType = {
   attempts: number
   error: number
   jobId: number
+  processingStartedAt: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -120,6 +123,7 @@ export type EmailMinAggregateInputType = {
   attempts?: true
   error?: true
   jobId?: true
+  processingStartedAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -137,6 +141,7 @@ export type EmailMaxAggregateInputType = {
   attempts?: true
   error?: true
   jobId?: true
+  processingStartedAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -154,6 +159,7 @@ export type EmailCountAggregateInputType = {
   attempts?: true
   error?: true
   jobId?: true
+  processingStartedAt?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -258,6 +264,7 @@ export type EmailGroupByOutputType = {
   attempts: number
   error: string | null
   jobId: string | null
+  processingStartedAt: Date | null
   createdAt: Date
   updatedAt: Date
   _count: EmailCountAggregateOutputType | null
@@ -298,6 +305,7 @@ export type EmailWhereInput = {
   attempts?: Prisma.IntFilter<"Email"> | number
   error?: Prisma.StringNullableFilter<"Email"> | string | null
   jobId?: Prisma.StringNullableFilter<"Email"> | string | null
+  processingStartedAt?: Prisma.DateTimeNullableFilter<"Email"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Email"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Email"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -317,6 +325,7 @@ export type EmailOrderByWithRelationInput = {
   attempts?: Prisma.SortOrder
   error?: Prisma.SortOrderInput | Prisma.SortOrder
   jobId?: Prisma.SortOrderInput | Prisma.SortOrder
+  processingStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
@@ -339,6 +348,7 @@ export type EmailWhereUniqueInput = Prisma.AtLeast<{
   status?: Prisma.EnumEmailStatusFilter<"Email"> | $Enums.EmailStatus
   attempts?: Prisma.IntFilter<"Email"> | number
   error?: Prisma.StringNullableFilter<"Email"> | string | null
+  processingStartedAt?: Prisma.DateTimeNullableFilter<"Email"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Email"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Email"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -358,6 +368,7 @@ export type EmailOrderByWithAggregationInput = {
   attempts?: Prisma.SortOrder
   error?: Prisma.SortOrderInput | Prisma.SortOrder
   jobId?: Prisma.SortOrderInput | Prisma.SortOrder
+  processingStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.EmailCountOrderByAggregateInput
@@ -383,6 +394,7 @@ export type EmailScalarWhereWithAggregatesInput = {
   attempts?: Prisma.IntWithAggregatesFilter<"Email"> | number
   error?: Prisma.StringNullableWithAggregatesFilter<"Email"> | string | null
   jobId?: Prisma.StringNullableWithAggregatesFilter<"Email"> | string | null
+  processingStartedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Email"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Email"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Email"> | Date | string
 }
@@ -397,6 +409,7 @@ export type EmailCreateInput = {
   attempts?: number
   error?: string | null
   jobId?: string | null
+  processingStartedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutEmailsInput
@@ -416,6 +429,7 @@ export type EmailUncheckedCreateInput = {
   attempts?: number
   error?: string | null
   jobId?: string | null
+  processingStartedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -430,6 +444,7 @@ export type EmailUpdateInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   jobId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutEmailsNestedInput
@@ -449,6 +464,7 @@ export type EmailUncheckedUpdateInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   jobId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -466,6 +482,7 @@ export type EmailCreateManyInput = {
   attempts?: number
   error?: string | null
   jobId?: string | null
+  processingStartedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -480,6 +497,7 @@ export type EmailUpdateManyMutationInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   jobId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -497,6 +515,7 @@ export type EmailUncheckedUpdateManyInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   jobId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -524,6 +543,7 @@ export type EmailCountOrderByAggregateInput = {
   attempts?: Prisma.SortOrder
   error?: Prisma.SortOrder
   jobId?: Prisma.SortOrder
+  processingStartedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -548,6 +568,7 @@ export type EmailMaxOrderByAggregateInput = {
   attempts?: Prisma.SortOrder
   error?: Prisma.SortOrder
   jobId?: Prisma.SortOrder
+  processingStartedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -565,6 +586,7 @@ export type EmailMinOrderByAggregateInput = {
   attempts?: Prisma.SortOrder
   error?: Prisma.SortOrder
   jobId?: Prisma.SortOrder
+  processingStartedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -678,6 +700,7 @@ export type EmailCreateWithoutUserInput = {
   attempts?: number
   error?: string | null
   jobId?: string | null
+  processingStartedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   sender: Prisma.SenderCreateNestedOneWithoutEmailsInput
@@ -695,6 +718,7 @@ export type EmailUncheckedCreateWithoutUserInput = {
   attempts?: number
   error?: string | null
   jobId?: string | null
+  processingStartedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -741,6 +765,7 @@ export type EmailScalarWhereInput = {
   attempts?: Prisma.IntFilter<"Email"> | number
   error?: Prisma.StringNullableFilter<"Email"> | string | null
   jobId?: Prisma.StringNullableFilter<"Email"> | string | null
+  processingStartedAt?: Prisma.DateTimeNullableFilter<"Email"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Email"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Email"> | Date | string
 }
@@ -755,6 +780,7 @@ export type EmailCreateWithoutSenderInput = {
   attempts?: number
   error?: string | null
   jobId?: string | null
+  processingStartedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutEmailsInput
@@ -772,6 +798,7 @@ export type EmailUncheckedCreateWithoutSenderInput = {
   attempts?: number
   error?: string | null
   jobId?: string | null
+  processingStartedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -814,6 +841,7 @@ export type EmailCreateManyUserInput = {
   attempts?: number
   error?: string | null
   jobId?: string | null
+  processingStartedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -828,6 +856,7 @@ export type EmailUpdateWithoutUserInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   jobId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sender?: Prisma.SenderUpdateOneRequiredWithoutEmailsNestedInput
@@ -845,6 +874,7 @@ export type EmailUncheckedUpdateWithoutUserInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   jobId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -861,6 +891,7 @@ export type EmailUncheckedUpdateManyWithoutUserInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   jobId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -877,6 +908,7 @@ export type EmailCreateManySenderInput = {
   attempts?: number
   error?: string | null
   jobId?: string | null
+  processingStartedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -891,6 +923,7 @@ export type EmailUpdateWithoutSenderInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   jobId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutEmailsNestedInput
@@ -908,6 +941,7 @@ export type EmailUncheckedUpdateWithoutSenderInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   jobId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -924,6 +958,7 @@ export type EmailUncheckedUpdateManyWithoutSenderInput = {
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   jobId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -943,6 +978,7 @@ export type EmailSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   attempts?: boolean
   error?: boolean
   jobId?: boolean
+  processingStartedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -962,6 +998,7 @@ export type EmailSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   attempts?: boolean
   error?: boolean
   jobId?: boolean
+  processingStartedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -981,6 +1018,7 @@ export type EmailSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   attempts?: boolean
   error?: boolean
   jobId?: boolean
+  processingStartedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -1000,11 +1038,12 @@ export type EmailSelectScalar = {
   attempts?: boolean
   error?: boolean
   jobId?: boolean
+  processingStartedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type EmailOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "senderId" | "to" | "subject" | "body" | "scheduledAt" | "sentAt" | "status" | "attempts" | "error" | "jobId" | "createdAt" | "updatedAt", ExtArgs["result"]["email"]>
+export type EmailOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "senderId" | "to" | "subject" | "body" | "scheduledAt" | "sentAt" | "status" | "attempts" | "error" | "jobId" | "processingStartedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["email"]>
 export type EmailInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   sender?: boolean | Prisma.SenderDefaultArgs<ExtArgs>
@@ -1037,6 +1076,7 @@ export type $EmailPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     attempts: number
     error: string | null
     jobId: string | null
+    processingStartedAt: Date | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["email"]>
@@ -1476,6 +1516,7 @@ export interface EmailFieldRefs {
   readonly attempts: Prisma.FieldRef<"Email", 'Int'>
   readonly error: Prisma.FieldRef<"Email", 'String'>
   readonly jobId: Prisma.FieldRef<"Email", 'String'>
+  readonly processingStartedAt: Prisma.FieldRef<"Email", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"Email", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Email", 'DateTime'>
 }
