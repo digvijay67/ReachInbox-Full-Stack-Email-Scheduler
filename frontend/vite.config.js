@@ -7,4 +7,5 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  base: "/ReachInbox-Full-Stack-Email-Scheduler/",
 });
