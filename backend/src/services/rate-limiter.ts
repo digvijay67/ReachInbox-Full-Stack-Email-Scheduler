@@ -17,16 +17,15 @@ const MIN_DELAY_MS = Number(
  * Rate limit is stored in Redis, so it works
  * across multiple workers / server instances.
  */
-export async function acquireHourlyLimit(
-  senderId: number
+function getHourlyLimitKey(
+  senderId: number,
+  now: Date = new Date()
 ) {
-  const now = new Date();
-
   const istNow = new Date(
-  now.toLocaleString("en-US", {
-    timeZone: "Asia/Kolkata",
-  })
-);
+    now.toLocaleString("en-US", {
+      timeZone: "Asia/Kolkata",
+    })
+  );
 
   const hourKey = [
     istNow.getFullYear(),
@@ -35,26 +34,25 @@ export async function acquireHourlyLimit(
     String(istNow.getHours()).padStart(2, "0"),
   ].join("-");
 
-  const key = `email-rate:${senderId}:${hourKey}`;
+  return `email-rate:${senderId}:${hourKey}`;
+}
 
+export async function acquireHourlyLimit(
+  senderId: number
+) {
+  const key = getHourlyLimitKey(senderId);
   const count = await redis.incr(key);
 
   if (count === 1) {
-    // Keep the counter slightly longer than one hour.
     await redis.expire(key, 3700);
   }
 
-  // Limit exceeded.
   if (count > MAX_EMAILS_PER_HOUR) {
-    // We did not actually send this email,
-    // therefore remove the increment.
     await redis.decr(key);
-
-    const retryAt = getNextHour();
 
     return {
       allowed: false,
-      retryAt,
+      retryAt: getNextHour(),
     };
   }
 
@@ -62,6 +60,28 @@ export async function acquireHourlyLimit(
     allowed: true,
     retryAt: null,
   };
+}
+
+export async function releaseHourlyLimit(
+  senderId: number
+) {
+  const key = getHourlyLimitKey(senderId);
+
+  const value = await redis.decr(key);
+
+  if (value < 0) {
+    await redis.set(key, "0");
+  }
+
+  return value;
+}
+
+export function isRateLimitError(
+  message: string
+) {
+  return /429|rate limit|all recipients were rejected/i.test(
+    message
+  );
 }
 
 /**

@@ -12,14 +12,25 @@ import { sendEmail } from "../lib/mailer";
 import { emailQueue } from "../queue/email.queue";
 import {
   acquireHourlyLimit,
+  getNextHour,
+  isRateLimitError,
+  releaseHourlyLimit,
   reserveSendSlot,
   sleepForSendSlot,
 } from "../services/rate-limiter";
 import { indexEmail } from "../services/email-search.service";
 import { notifySlack } from "../lib/slack";
+import {
+  canProcessEmail,
+  shouldSkipDeletedEmail,
+} from "./email-job-guards";
 
 const WORKER_CONCURRENCY = Number(
   process.env.WORKER_CONCURRENCY || 5
+);
+
+const MAX_JOB_ATTEMPTS = Number(
+  process.env.MAX_JOB_ATTEMPTS || 5
 );
 
 // Threshold used ONLY by the startup recovery pass below.
@@ -135,7 +146,7 @@ async function recoverStaleProcessingEmails() {
         continue;
       }
 
-      await emailQueue.add(
+      const recoveredJob = await emailQueue.add(
         "send-email",
 
         {
@@ -148,6 +159,17 @@ async function recoverStaleProcessingEmails() {
           jobId: `email-${email.id}-recover-${Date.now()}`,
         }
       );
+
+      await prisma.email.update({
+        where: {
+          id: email.id,
+        },
+        data: {
+          status: "SCHEDULED",
+          processingStartedAt: null,
+          jobId: String(recoveredJob.id),
+        },
+      });
 
       console.log(
         `Recovered orphaned PROCESSING email ${email.id} — re-queued for immediate send.`
@@ -223,7 +245,7 @@ async function recoverOrphanedScheduledEmails() {
         continue;
       }
 
-      await emailQueue.add(
+      const recoveredJob = await emailQueue.add(
         "send-email",
 
         {
@@ -237,6 +259,17 @@ async function recoverOrphanedScheduledEmails() {
         }
       );
 
+      await prisma.email.update({
+        where: {
+          id: email.id,
+        },
+        data: {
+          status: "SCHEDULED",
+          processingStartedAt: null,
+          jobId: String(recoveredJob.id),
+        },
+      });
+
       console.log(
         `Recovered orphaned SCHEDULED email ${email.id} (no live BullMQ job found) — re-queued for immediate send.`
       );
@@ -244,6 +277,79 @@ async function recoverOrphanedScheduledEmails() {
   } catch (error) {
     console.error(
       "Startup recovery of orphaned SCHEDULED emails failed:",
+      error
+    );
+  }
+}
+
+async function recoverStaleFailedEmails() {
+  try {
+    const staleFailedEmails = await prisma.email.findMany({
+      where: {
+        status: "FAILED",
+        attempts: {
+          lt: MAX_JOB_ATTEMPTS,
+        },
+      },
+    });
+
+    if (staleFailedEmails.length === 0) {
+      return;
+    }
+
+    console.log(
+      `Found ${staleFailedEmails.length} FAILED email(s) without a live queue retry, checking recovery...`
+    );
+
+    for (const email of staleFailedEmails) {
+      const jobId = email.jobId || `email-${email.id}`;
+      const existingJob = await emailQueue.getJob(jobId);
+
+      let isLive = false;
+
+      if (existingJob) {
+        const state = await existingJob.getState();
+        isLive =
+          state === "active" ||
+          state === "waiting" ||
+          state === "delayed" ||
+          state === "waiting-children";
+      }
+
+      if (isLive) {
+        continue;
+      }
+
+      const recoveredJob = await emailQueue.add(
+        "send-email",
+        {
+          emailId: email.id,
+        },
+        {
+          delay: 0,
+          jobId: `email-${email.id}-recover-${Date.now()}`,
+        }
+      );
+
+      await prisma.email.update({
+        where: {
+          id: email.id,
+        },
+        data: {
+          status: "SCHEDULED",
+          processingStartedAt: null,
+          jobId: String(recoveredJob.id),
+          error: null,
+        },
+      });
+
+      console.log(
+        `Recovered stale FAILED email ${email.id} — re-queued for retry.`
+      );
+    }
+  } catch (error) {
+    console.error(
+      "Startup recovery of stale FAILED emails failed:",
       error
     );
   }
@@ -279,19 +385,26 @@ const worker = new Worker(
         },
       });
 
-    if (!email) {
-      throw new Error(
-        `Email ${emailId} not found`
+    if (shouldSkipDeletedEmail(email)) {
+      console.log(
+        `Email ${emailId} was deleted before processing. Skipping.`
       );
+
+      return {
+        success: true,
+        skipped: true,
+        deleted: true,
+        emailId: emailId,
+      };
     }
 
     // ------------------------------------
     // 2. Idempotency
     // ------------------------------------
 
-    if (email.status === "SENT") {
+    if (!canProcessEmail(email)) {
       console.log(
-        `Email ${email.id} already sent. Skipping.`
+        `Email ${email.id} is not processable. Skipping.`
       );
 
       return {
@@ -302,7 +415,62 @@ const worker = new Worker(
     }
 
     // ------------------------------------
-    // 3. Hourly rate limit
+    // 3. Minimum delay between sends
+    //
+    // Short waits are slept inline. A wait long enough to risk
+    // exceeding this job's BullMQ lock (see MAX_INLINE_WAIT_MS
+    // in rate-limiter.ts) is NOT slept inline — instead this job
+    // is released and re-queued as a fresh delayed job for the
+    // exact reserved time, so Redis holds the wait, not a live
+    // process thread. Prevents false stalled-job detection under
+    // burst load (e.g. many emails for the same sender due at once).
+    // ------------------------------------
+
+    const sendSlot = await reserveSendSlot(
+      email.senderId
+    );
+
+    if (sendSlot.shouldDefer) {
+      console.log(
+        `Deferring email ${email.id} to ${sendSlot.nextSendAt.toISOString()} (min-delay spacing)`
+      );
+
+      const deferredJob = await emailQueue.add(
+        "send-email",
+        {
+          emailId: email.id,
+        },
+        {
+          delay: sendSlot.waitMs,
+          jobId: `email-${email.id}-delay-${sendSlot.nextSendAt.getTime()}`,
+        }
+      );
+
+      await prisma.email.update({
+        where: {
+          id: email.id,
+        },
+        data: {
+          status: "SCHEDULED",
+          scheduledAt: sendSlot.nextSendAt,
+          processingStartedAt: null,
+          jobId: String(deferredJob.id),
+          error: null,
+        },
+      });
+
+      return {
+        success: false,
+        deferred: true,
+        emailId: email.id,
+        retryAt: sendSlot.nextSendAt.toISOString(),
+      };
+    }
+
+    await sleepForSendSlot(sendSlot.waitMs);
+
+    // ------------------------------------
+    // 4. Hourly rate limit
     // ------------------------------------
 
     const rateLimit =
@@ -310,19 +478,8 @@ const worker = new Worker(
         email.senderId
       );
 
-
-
     if (!rateLimit.allowed) {
       const retryAt = rateLimit.retryAt!;
-
-      await prisma.email.update({
-        where: {
-          id: email.id,
-        },
-        data: {
-          scheduledAt: retryAt,
-        },
-      });
 
       const delay = Math.max(
         retryAt.getTime() - Date.now(),
@@ -336,14 +493,6 @@ const worker = new Worker(
       console.log(
         `Rescheduling email ${email.id} for ${retryAt.toISOString()}`
       );
-      await prisma.email.update({
-        where: {
-          id: email.id,
-        },
-        data: {
-          scheduledAt: retryAt,
-        },
-      });
 
       const indianResumeTime = retryAt.toLocaleString("en-IN", {
         timeZone: "Asia/Kolkata",
@@ -365,7 +514,8 @@ const worker = new Worker(
       console.log(
         `Slack notification requested for user ${email.userId}`
       );
-      await emailQueue.add(
+
+      const retryJob = await emailQueue.add(
         "send-email",
         {
           emailId: email.id,
@@ -376,6 +526,19 @@ const worker = new Worker(
         }
       );
 
+      await prisma.email.update({
+        where: {
+          id: email.id,
+        },
+        data: {
+          status: "SCHEDULED",
+          scheduledAt: retryAt,
+          processingStartedAt: null,
+          jobId: String(retryJob.id),
+          error: null,
+        },
+      });
+
       return {
         success: false,
         rateLimited: true,
@@ -383,47 +546,6 @@ const worker = new Worker(
         retryAt: retryAt.toISOString(),
       };
     }
-    // ------------------------------------
-    // 4. Minimum delay between sends
-    //
-    // Short waits are slept inline. A wait long enough to risk
-    // exceeding this job's BullMQ lock (see MAX_INLINE_WAIT_MS
-    // in rate-limiter.ts) is NOT slept inline — instead this job
-    // is released and re-queued as a fresh delayed job for the
-    // exact reserved time, so Redis holds the wait, not a live
-    // process thread. Prevents false stalled-job detection under
-    // burst load (e.g. many emails for the same sender due at once).
-    // ------------------------------------
-
-    const sendSlot = await reserveSendSlot(
-      email.senderId
-    );
-
-    if (sendSlot.shouldDefer) {
-      console.log(
-        `Deferring email ${email.id} to ${sendSlot.nextSendAt.toISOString()} (min-delay spacing)`
-      );
-
-      await emailQueue.add(
-        "send-email",
-        {
-          emailId: email.id,
-        },
-        {
-          delay: sendSlot.waitMs,
-          jobId: `email-${email.id}-delay-${sendSlot.nextSendAt.getTime()}`,
-        }
-      );
-
-      return {
-        success: false,
-        deferred: true,
-        emailId: email.id,
-        retryAt: sendSlot.nextSendAt.toISOString(),
-      };
-    }
-
-    await sleepForSendSlot(sendSlot.waitMs);
 
     // ------------------------------------
     // 5. Atomically mark PROCESSING
@@ -452,9 +574,8 @@ const worker = new Worker(
 
         data: {
           status: "PROCESSING",
-
+          jobId: String(job.id),
           processingStartedAt: new Date(),
-
           attempts: {
             increment: 1,
           },
@@ -536,14 +657,70 @@ const worker = new Worker(
         messageId: result.messageId,
       };
     } catch (error) {
-      // ------------------------------------
-      // 8. Mark FAILED
-      // ------------------------------------
-
       const message =
         error instanceof Error
           ? error.message
           : "Unknown email error";
+
+      if (isRateLimitError(message)) {
+        const retryAt = getNextHour();
+        const delay = Math.max(
+          retryAt.getTime() - Date.now(),
+          1000
+        );
+
+        await releaseHourlyLimit(email.senderId);
+
+        const indianResumeTime = retryAt.toLocaleString("en-IN", {
+          timeZone: "Asia/Kolkata",
+          dateStyle: "medium",
+          timeStyle: "short",
+        });
+
+        await notifySlack(
+          email.userId,
+          `⚠️ *Sender rate limit hit while sending*
+
+Email #${email.id} to ${email.to} has been rescheduled.
+
+🕐 *Resume time:* ${indianResumeTime} IST`
+        );
+
+        const retryJob = await emailQueue.add(
+          "send-email",
+          {
+            emailId: email.id,
+          },
+          {
+            delay,
+            jobId: `email-${email.id}-retry-${retryAt.getTime()}`,
+          }
+        );
+
+        await prisma.email.update({
+          where: {
+            id: email.id,
+          },
+          data: {
+            status: "SCHEDULED",
+            scheduledAt: retryAt,
+            processingStartedAt: null,
+            jobId: String(retryJob.id),
+            error: null,
+          },
+        });
+
+        console.log(
+          `Email ${email.id} rate limited during send; rescheduled for ${retryAt.toISOString()}`
+        );
+
+        return {
+          success: false,
+          rateLimited: true,
+          emailId: email.id,
+          retryAt: retryAt.toISOString(),
+        };
+      }
 
       const failedEmail = await prisma.email.update({
         where: {
@@ -563,6 +740,7 @@ const worker = new Worker(
         },
       });
 
+      await releaseHourlyLimit(email.senderId);
       await indexEmail(failedEmail);
 
       console.error(
@@ -650,6 +828,12 @@ recoverStaleProcessingEmails();
 // underlying BullMQ job is missing entirely (e.g. Redis was
 // restarted/reconfigured since the job was created).
 recoverOrphanedScheduledEmails();
+
+// Run once on boot: reconcile stale FAILED rows whose BullMQ retry
+// job is also gone (e.g. abrupt shutdown or queue reset). We only
+// recover rows that still have retry attempts left, otherwise they
+// are intentionally terminal failures.
+recoverStaleFailedEmails();
 
 
 // import "dotenv/config";

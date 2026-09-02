@@ -215,7 +215,35 @@ const worker = new bullmq_1.Worker("email-queue", (job) => __awaiter(void 0, voi
         };
     }
     // ------------------------------------
-    // 3. Hourly rate limit
+    // 3. Minimum delay between sends
+    //
+    // Short waits are slept inline. A wait long enough to risk
+    // exceeding this job's BullMQ lock (see MAX_INLINE_WAIT_MS
+    // in rate-limiter.ts) is NOT slept inline — instead this job
+    // is released and re-queued as a fresh delayed job for the
+    // exact reserved time, so Redis holds the wait, not a live
+    // process thread. Prevents false stalled-job detection under
+    // burst load (e.g. many emails for the same sender due at once).
+    // ------------------------------------
+    const sendSlot = yield (0, rate_limiter_1.reserveSendSlot)(email.senderId);
+    if (sendSlot.shouldDefer) {
+        console.log(`Deferring email ${email.id} to ${sendSlot.nextSendAt.toISOString()} (min-delay spacing)`);
+        yield email_queue_1.emailQueue.add("send-email", {
+            emailId: email.id,
+        }, {
+            delay: sendSlot.waitMs,
+            jobId: `email-${email.id}-delay-${sendSlot.nextSendAt.getTime()}`,
+        });
+        return {
+            success: false,
+            deferred: true,
+            emailId: email.id,
+            retryAt: sendSlot.nextSendAt.toISOString(),
+        };
+    }
+    yield (0, rate_limiter_1.sleepForSendSlot)(sendSlot.waitMs);
+    // ------------------------------------
+    // 4. Hourly rate limit
     // ------------------------------------
     const rateLimit = yield (0, rate_limiter_1.acquireHourlyLimit)(email.senderId);
     if (!rateLimit.allowed) {
@@ -265,34 +293,6 @@ const worker = new bullmq_1.Worker("email-queue", (job) => __awaiter(void 0, voi
             retryAt: retryAt.toISOString(),
         };
     }
-    // ------------------------------------
-    // 4. Minimum delay between sends
-    //
-    // Short waits are slept inline. A wait long enough to risk
-    // exceeding this job's BullMQ lock (see MAX_INLINE_WAIT_MS
-    // in rate-limiter.ts) is NOT slept inline — instead this job
-    // is released and re-queued as a fresh delayed job for the
-    // exact reserved time, so Redis holds the wait, not a live
-    // process thread. Prevents false stalled-job detection under
-    // burst load (e.g. many emails for the same sender due at once).
-    // ------------------------------------
-    const sendSlot = yield (0, rate_limiter_1.reserveSendSlot)(email.senderId);
-    if (sendSlot.shouldDefer) {
-        console.log(`Deferring email ${email.id} to ${sendSlot.nextSendAt.toISOString()} (min-delay spacing)`);
-        yield email_queue_1.emailQueue.add("send-email", {
-            emailId: email.id,
-        }, {
-            delay: sendSlot.waitMs,
-            jobId: `email-${email.id}-delay-${sendSlot.nextSendAt.getTime()}`,
-        });
-        return {
-            success: false,
-            deferred: true,
-            emailId: email.id,
-            retryAt: sendSlot.nextSendAt.toISOString(),
-        };
-    }
-    yield (0, rate_limiter_1.sleepForSendSlot)(sendSlot.waitMs);
     // ------------------------------------
     // 5. Atomically mark PROCESSING
     //
