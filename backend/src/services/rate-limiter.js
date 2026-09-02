@@ -10,6 +10,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.acquireHourlyLimit = acquireHourlyLimit;
+exports.releaseHourlyLimit = releaseHourlyLimit;
+exports.isRateLimitError = isRateLimitError;
 exports.reserveSendSlot = reserveSendSlot;
 exports.sleepForSendSlot = sleepForSendSlot;
 exports.getNextHour = getNextHour;
@@ -25,33 +27,30 @@ const MIN_DELAY_MS = Number(process.env.MIN_DELAY_MS || 2000);
  * Rate limit is stored in Redis, so it works
  * across multiple workers / server instances.
  */
+function getHourlyLimitKey(senderId, now = new Date()) {
+    const istNow = new Date(now.toLocaleString("en-US", {
+        timeZone: "Asia/Kolkata",
+    }));
+    const hourKey = [
+        istNow.getFullYear(),
+        String(istNow.getMonth() + 1).padStart(2, "0"),
+        String(istNow.getDate()).padStart(2, "0"),
+        String(istNow.getHours()).padStart(2, "0"),
+    ].join("-");
+    return `email-rate:${senderId}:${hourKey}`;
+}
 function acquireHourlyLimit(senderId) {
     return __awaiter(this, void 0, void 0, function* () {
-        const now = new Date();
-        const istNow = new Date(now.toLocaleString("en-US", {
-            timeZone: "Asia/Kolkata",
-        }));
-        const hourKey = [
-            istNow.getFullYear(),
-            String(istNow.getMonth() + 1).padStart(2, "0"),
-            String(istNow.getDate()).padStart(2, "0"),
-            String(istNow.getHours()).padStart(2, "0"),
-        ].join("-");
-        const key = `email-rate:${senderId}:${hourKey}`;
+        const key = getHourlyLimitKey(senderId);
         const count = yield redis_1.redis.incr(key);
         if (count === 1) {
-            // Keep the counter slightly longer than one hour.
             yield redis_1.redis.expire(key, 3700);
         }
-        // Limit exceeded.
         if (count > MAX_EMAILS_PER_HOUR) {
-            // We did not actually send this email,
-            // therefore remove the increment.
             yield redis_1.redis.decr(key);
-            const retryAt = getNextHour();
             return {
                 allowed: false,
-                retryAt,
+                retryAt: getNextHour(),
             };
         }
         return {
@@ -59,6 +58,19 @@ function acquireHourlyLimit(senderId) {
             retryAt: null,
         };
     });
+}
+function releaseHourlyLimit(senderId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const key = getHourlyLimitKey(senderId);
+        const value = yield redis_1.redis.decr(key);
+        if (value < 0) {
+            yield redis_1.redis.set(key, "0");
+        }
+        return value;
+    });
+}
+function isRateLimitError(message) {
+    return /429|rate limit|all recipients were rejected/i.test(message);
 }
 /**
  * Above this, we do NOT block inline inside the job.

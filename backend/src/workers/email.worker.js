@@ -18,7 +18,9 @@ const email_queue_1 = require("../queue/email.queue");
 const rate_limiter_1 = require("../services/rate-limiter");
 const email_search_service_1 = require("../services/email-search.service");
 const slack_1 = require("../lib/slack");
+const email_job_guards_1 = require("./email-job-guards");
 const WORKER_CONCURRENCY = Number(process.env.WORKER_CONCURRENCY || 5);
+const MAX_JOB_ATTEMPTS = Number(process.env.MAX_JOB_ATTEMPTS || 5);
 // Threshold used ONLY by the startup recovery pass below.
 // Must safely exceed lockDuration + (maxStalledCount * stalledInterval)
 // so we never race against BullMQ's own in-flight stalled-job
@@ -108,11 +110,21 @@ function recoverStaleProcessingEmails() {
                     // read and this write — nothing to do.
                     continue;
                 }
-                yield email_queue_1.emailQueue.add("send-email", {
+                const recoveredJob = yield email_queue_1.emailQueue.add("send-email", {
                     emailId: email.id,
                 }, {
                     delay: 0,
                     jobId: `email-${email.id}-recover-${Date.now()}`,
+                });
+                yield prisma_1.prisma.email.update({
+                    where: {
+                        id: email.id,
+                    },
+                    data: {
+                        status: "SCHEDULED",
+                        processingStartedAt: null,
+                        jobId: String(recoveredJob.id),
+                    },
                 });
                 console.log(`Recovered orphaned PROCESSING email ${email.id} — re-queued for immediate send.`);
             }
@@ -169,17 +181,82 @@ function recoverOrphanedScheduledEmails() {
                     // Real, live job — BullMQ will dispatch it normally.
                     continue;
                 }
-                yield email_queue_1.emailQueue.add("send-email", {
+                const recoveredJob = yield email_queue_1.emailQueue.add("send-email", {
                     emailId: email.id,
                 }, {
                     delay: 0,
                     jobId: `email-${email.id}-recover-${Date.now()}`,
+                });
+                yield prisma_1.prisma.email.update({
+                    where: {
+                        id: email.id,
+                    },
+                    data: {
+                        status: "SCHEDULED",
+                        processingStartedAt: null,
+                        jobId: String(recoveredJob.id),
+                    },
                 });
                 console.log(`Recovered orphaned SCHEDULED email ${email.id} (no live BullMQ job found) — re-queued for immediate send.`);
             }
         }
         catch (error) {
             console.error("Startup recovery of orphaned SCHEDULED emails failed:", error);
+        }
+    });
+}
+function recoverStaleFailedEmails() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const staleFailedEmails = yield prisma_1.prisma.email.findMany({
+                where: {
+                    status: "FAILED",
+                    attempts: {
+                        lt: MAX_JOB_ATTEMPTS,
+                    },
+                },
+            });
+            if (staleFailedEmails.length === 0) {
+                return;
+            }
+            console.log(`Found ${staleFailedEmails.length} FAILED email(s) without a live queue retry, checking recovery...`);
+            for (const email of staleFailedEmails) {
+                const jobId = email.jobId || `email-${email.id}`;
+                const existingJob = yield email_queue_1.emailQueue.getJob(jobId);
+                let isLive = false;
+                if (existingJob) {
+                    const state = yield existingJob.getState();
+                    isLive =
+                        state === "active" ||
+                            state === "waiting" ||
+                            state === "delayed" ||
+                            state === "waiting-children";
+                }
+                if (isLive) {
+                    continue;
+                }
+                const recoveredJob = yield email_queue_1.emailQueue.add("send-email", {
+                    emailId: email.id,
+                }, {
+                    delay: 0,
+                    jobId: `email-${email.id}-recover-${Date.now()}`,
+                });
+                yield prisma_1.prisma.email.update({
+                    where: {
+                        id: email.id,
+                    },
+                    data: {
+                        status: "SCHEDULED",
+                        processingStartedAt: null,
+                        jobId: String(recoveredJob.id),
+                        error: null,
+                    },
+                });
+                console.log(`Recovered stale FAILED email ${email.id} — re-queued for retry.`);
+            }
+        }
+        catch (error) {
+            console.error("Startup recovery of stale FAILED emails failed:", error);
         }
     });
 }
@@ -200,14 +277,20 @@ const worker = new bullmq_1.Worker("email-queue", (job) => __awaiter(void 0, voi
             sender: true,
         },
     });
-    if (!email) {
-        throw new Error(`Email ${emailId} not found`);
+    if ((0, email_job_guards_1.shouldSkipDeletedEmail)(email)) {
+        console.log(`Email ${emailId} was deleted before processing. Skipping.`);
+        return {
+            success: true,
+            skipped: true,
+            deleted: true,
+            emailId: emailId,
+        };
     }
     // ------------------------------------
     // 2. Idempotency
     // ------------------------------------
-    if (email.status === "SENT") {
-        console.log(`Email ${email.id} already sent. Skipping.`);
+    if (!(0, email_job_guards_1.canProcessEmail)(email)) {
+        console.log(`Email ${email.id} is not processable. Skipping.`);
         return {
             success: true,
             skipped: true,
@@ -228,11 +311,23 @@ const worker = new bullmq_1.Worker("email-queue", (job) => __awaiter(void 0, voi
     const sendSlot = yield (0, rate_limiter_1.reserveSendSlot)(email.senderId);
     if (sendSlot.shouldDefer) {
         console.log(`Deferring email ${email.id} to ${sendSlot.nextSendAt.toISOString()} (min-delay spacing)`);
-        yield email_queue_1.emailQueue.add("send-email", {
+        const deferredJob = yield email_queue_1.emailQueue.add("send-email", {
             emailId: email.id,
         }, {
             delay: sendSlot.waitMs,
             jobId: `email-${email.id}-delay-${sendSlot.nextSendAt.getTime()}`,
+        });
+        yield prisma_1.prisma.email.update({
+            where: {
+                id: email.id,
+            },
+            data: {
+                status: "SCHEDULED",
+                scheduledAt: sendSlot.nextSendAt,
+                processingStartedAt: null,
+                jobId: String(deferredJob.id),
+                error: null,
+            },
         });
         return {
             success: false,
@@ -248,25 +343,9 @@ const worker = new bullmq_1.Worker("email-queue", (job) => __awaiter(void 0, voi
     const rateLimit = yield (0, rate_limiter_1.acquireHourlyLimit)(email.senderId);
     if (!rateLimit.allowed) {
         const retryAt = rateLimit.retryAt;
-        yield prisma_1.prisma.email.update({
-            where: {
-                id: email.id,
-            },
-            data: {
-                scheduledAt: retryAt,
-            },
-        });
         const delay = Math.max(retryAt.getTime() - Date.now(), 1000);
         console.log(`Hourly limit reached for sender ${email.senderId}`);
         console.log(`Rescheduling email ${email.id} for ${retryAt.toISOString()}`);
-        yield prisma_1.prisma.email.update({
-            where: {
-                id: email.id,
-            },
-            data: {
-                scheduledAt: retryAt,
-            },
-        });
         const indianResumeTime = retryAt.toLocaleString("en-IN", {
             timeZone: "Asia/Kolkata",
             dateStyle: "medium",
@@ -280,11 +359,23 @@ const worker = new bullmq_1.Worker("email-queue", (job) => __awaiter(void 0, voi
 
 🕐 *Resume time:* ${indianResumeTime} IST`);
         console.log(`Slack notification requested for user ${email.userId}`);
-        yield email_queue_1.emailQueue.add("send-email", {
+        const retryJob = yield email_queue_1.emailQueue.add("send-email", {
             emailId: email.id,
         }, {
             delay,
             jobId: `email-${email.id}-retry-${retryAt.getTime()}`,
+        });
+        yield prisma_1.prisma.email.update({
+            where: {
+                id: email.id,
+            },
+            data: {
+                status: "SCHEDULED",
+                scheduledAt: retryAt,
+                processingStartedAt: null,
+                jobId: String(retryJob.id),
+                error: null,
+            },
         });
         return {
             success: false,
@@ -316,6 +407,7 @@ const worker = new bullmq_1.Worker("email-queue", (job) => __awaiter(void 0, voi
         },
         data: {
             status: "PROCESSING",
+            jobId: String(job.id),
             processingStartedAt: new Date(),
             attempts: {
                 increment: 1,
@@ -369,12 +461,49 @@ const worker = new bullmq_1.Worker("email-queue", (job) => __awaiter(void 0, voi
         };
     }
     catch (error) {
-        // ------------------------------------
-        // 8. Mark FAILED
-        // ------------------------------------
         const message = error instanceof Error
             ? error.message
             : "Unknown email error";
+        if ((0, rate_limiter_1.isRateLimitError)(message)) {
+            const retryAt = (0, rate_limiter_1.getNextHour)();
+            const delay = Math.max(retryAt.getTime() - Date.now(), 1000);
+            yield (0, rate_limiter_1.releaseHourlyLimit)(email.senderId);
+            const indianResumeTime = retryAt.toLocaleString("en-IN", {
+                timeZone: "Asia/Kolkata",
+                dateStyle: "medium",
+                timeStyle: "short",
+            });
+            yield (0, slack_1.notifySlack)(email.userId, `⚠️ *Sender rate limit hit while sending*
+
+Email #${email.id} to ${email.to} has been rescheduled.
+
+🕐 *Resume time:* ${indianResumeTime} IST`);
+            const retryJob = yield email_queue_1.emailQueue.add("send-email", {
+                emailId: email.id,
+            }, {
+                delay,
+                jobId: `email-${email.id}-retry-${retryAt.getTime()}`,
+            });
+            yield prisma_1.prisma.email.update({
+                where: {
+                    id: email.id,
+                },
+                data: {
+                    status: "SCHEDULED",
+                    scheduledAt: retryAt,
+                    processingStartedAt: null,
+                    jobId: String(retryJob.id),
+                    error: null,
+                },
+            });
+            console.log(`Email ${email.id} rate limited during send; rescheduled for ${retryAt.toISOString()}`);
+            return {
+                success: false,
+                rateLimited: true,
+                emailId: email.id,
+                retryAt: retryAt.toISOString(),
+            };
+        }
         const failedEmail = yield prisma_1.prisma.email.update({
             where: {
                 id: email.id,
@@ -388,6 +517,7 @@ const worker = new bullmq_1.Worker("email-queue", (job) => __awaiter(void 0, voi
                 sender: true,
             },
         });
+        yield (0, rate_limiter_1.releaseHourlyLimit)(email.senderId);
         yield (0, email_search_service_1.indexEmail)(failedEmail);
         console.error(`Email ${email.id} failed:`, message);
         throw error;
@@ -432,6 +562,11 @@ recoverStaleProcessingEmails();
 // underlying BullMQ job is missing entirely (e.g. Redis was
 // restarted/reconfigured since the job was created).
 recoverOrphanedScheduledEmails();
+// Run once on boot: reconcile stale FAILED rows whose BullMQ retry
+// job is also gone (e.g. abrupt shutdown or queue reset). We only
+// recover rows that still have retry attempts left, otherwise they
+// are intentionally terminal failures.
+recoverStaleFailedEmails();
 // import "dotenv/config";
 // import {
 //   Worker,
