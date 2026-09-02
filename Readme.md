@@ -11,7 +11,7 @@ This project is designed for local development and deployment-friendly startup, 
 <table>
 
   <tr>
-     <td><img src="docs/screenshots/screenshot-222928.png" alt="ReachInbox login page"></td>
+     <td><img src="docs/screenshots/Screenshot 2026-09-02 223924.png" alt="ReachInbox google OAuth"></td>
     <td><img src="docs/screenshots/screenshot-222928.png" alt="ReachInbox login page"></td>
     <td><img src="docs/screenshots/screenshot-222730.png" alt="ReachInbox dashboard"></td>
   </tr>
